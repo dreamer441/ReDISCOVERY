@@ -1,0 +1,10 @@
+{
+  "enabledPlugins": {
+    "unreal-engine-skills-for-claude-code@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "claude-hud@claude-hud": true
+  },
+  "env": {
+    "CLAUDE_CODE_GIT_BASH_PATH": "D:\\Git\\bin\\bash.exe"
+  }
+}

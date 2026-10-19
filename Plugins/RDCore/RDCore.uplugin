@@ -1,0 +1,16 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "RD Core",
+	"Description": "REDISCOVERY foundation: shared contracts (request results, tags, authority helpers). No gameplay.",
+	"Category": "Rediscovery",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "RDCore",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

@@ -1,0 +1,38 @@
+﻿# Unreal generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Plugin generated
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+Plugins/**/Saved/
+
+# Visual Studio / IDE
+.vs/
+.idea/
+.vscode/
+*.sln
+*.slnx
+*.suo
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Claude local/session state
+.claude/settings.local.json
+.claude/ralph-loop.local.md
+
+# Logs/temp
+*.log
+*.tmp
+
+# Local test/dev content not part of the game (owner may revisit)
+Content/AI_Tests/
+Content/Developers/
