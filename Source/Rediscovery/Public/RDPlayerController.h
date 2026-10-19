@@ -1,8 +1,8 @@
-// Turns devices (keyboard, mouse) into player INTENTS and hands them to the pawn's player-state component.
-// The controller never decides what an intent means; the active player state does.
-// For now the input actions and key mapping are created in code (no input assets yet):
-//   Move = WASD, Look = mouse, Jump = Space, Vertical = E/Q (and Space/Ctrl) for Free Roam,
-//   Pointer = left mouse (Top Down click-to-move), StateNext = Up arrow, StatePrev = Down arrow.
+// Turns devices into player INTENTS and hands them on. It never decides what an intent means.
+// - Keys -> intents: each player state supplies its own key mapping; the controller adds the active state's
+//   mapping (plus a small base mapping: mouse look, Up/Down state switching) and swaps it on state change.
+// - Intents -> systems: movement/camera intents go to the pawn's player-state component; the Cast intent asks the
+//   active state where it aims and passes that to the pawn's caster component.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,9 +10,10 @@
 #include "GameplayTagContainer.h"
 #include "RDPlayerController.generated.h"
 
-class UInputAction;
 class UInputMappingContext;
+class URDPlayerIntents;
 class URDPlayerStateComponent;
+class URDCasterComponent;
 struct FInputActionValue;
 
 UCLASS()
@@ -25,29 +26,31 @@ protected:
 	virtual void AcknowledgePossession(APawn* P) override;
 
 private:
-	void CreateInputAssets();
 	URDPlayerStateComponent* GetStateComponent() const;
+	URDCasterComponent* GetCasterComponent() const;
 
-	// Device -> intent handlers
+	// Intent handlers
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnJumpPressed();
 	void OnJumpReleased();
+	void OnSprintPressed();
+	void OnSprintReleased();
+	void OnAimPressed();
+	void OnAimReleased();
+	void OnCameraDragPressed();
+	void OnCameraDragReleased();
 	void OnVertical(const FInputActionValue& Value);
-	void OnPointer();
+	void OnPoint();
+	void OnCast();
 	void OnStateNext();
 	void OnStatePrev();
 
-	// Shows the state name on screen and swaps the state's extra input context, if it has one.
+	// Shows the state name on screen and swaps in the new state's key mapping.
 	UFUNCTION()
 	void HandleStateChanged(FGameplayTag OldState, FGameplayTag NewState);
 
+	UPROPERTY(Transient) TObjectPtr<URDPlayerIntents> Intents;
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> BaseContext;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> MoveAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> LookAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> JumpAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> VerticalAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> PointerAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> StateNextAction;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> StatePrevAction;
+	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> ActiveStateContext;
 };

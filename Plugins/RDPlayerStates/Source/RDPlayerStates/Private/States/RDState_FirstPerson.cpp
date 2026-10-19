@@ -1,5 +1,6 @@
 #include "States/RDState_FirstPerson.h"
 #include "IRDPlayerStateHost.h"
+#include "RDPlayerIntents.h"
 #include "RDPlayerStateTags.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -10,6 +11,14 @@ URDState_FirstPerson::URDState_FirstPerson()
 {
 	StateTag = RDPlayerStateTags::FirstPerson;
 	DisplayName = NSLOCTEXT("RDPlayerStates", "FirstPerson", "1 - First Person");
+}
+
+void URDState_FirstPerson::MapKeys(UInputMappingContext& Context, const URDPlayerIntents& Intents) const
+{
+	URDPlayerIntents::MapWASD(&Context, Intents.Move);
+	URDPlayerIntents::MapKey(&Context, Intents.Jump, EKeys::SpaceBar);
+	URDPlayerIntents::MapKey(&Context, Intents.Sprint, EKeys::LeftShift);
+	URDPlayerIntents::MapKey(&Context, Intents.Cast, EKeys::LeftMouseButton);
 }
 
 void URDState_FirstPerson::OnEnter(IRDPlayerStateHost& Host)

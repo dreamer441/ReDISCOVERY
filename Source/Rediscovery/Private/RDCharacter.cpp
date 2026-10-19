@@ -1,5 +1,6 @@
 #include "RDCharacter.h"
 #include "RDPlayerStateComponent.h"
+#include "RDCasterComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -51,6 +52,7 @@ ARDCharacter::ARDCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 
 	PlayerStates = CreateDefaultSubobject<URDPlayerStateComponent>(TEXT("PlayerStates"));
+	Caster = CreateDefaultSubobject<URDCasterComponent>(TEXT("Caster"));
 }
 
 UPrimitiveComponent* ARDCharacter::GetBodyMesh() const

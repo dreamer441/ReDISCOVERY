@@ -53,6 +53,10 @@
     {
       "Name": "RDPlayerStates",
       "Enabled": true
+    },
+    {
+      "Name": "RDCasting",
+      "Enabled": true
     }
   ]
 }

@@ -25,6 +25,7 @@ struct RDPLAYERSTATES_API FRDPlayerRigSnapshot
 	FVector CameraLocation = FVector::ZeroVector;
 	FRotator CameraRotation = FRotator::ZeroRotator;
 	bool bCameraUsesControlRotation = false;
+	float FieldOfView = 90.f;
 
 	// Pawn and movement
 	bool bPawnUsesControllerYaw = false;

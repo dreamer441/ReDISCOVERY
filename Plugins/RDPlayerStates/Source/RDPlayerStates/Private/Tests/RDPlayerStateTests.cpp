@@ -3,6 +3,9 @@
 #include "RDPlayerStateComponent.h"
 #include "RDPlayerStateDefinition.h"
 #include "RDPlayerStateTags.h"
+#include "RDPlayerIntents.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -66,6 +69,62 @@ bool FRDPlayerStatesDefinitionsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Has ThirdPerson"), Seen.Contains(RDPlayerStateTags::ThirdPerson));
 	TestTrue(TEXT("Has TopDown"), Seen.Contains(RDPlayerStateTags::TopDown));
 	TestTrue(TEXT("Has FreeRoam"), Seen.Contains(RDPlayerStateTags::FreeRoam));
+	return true;
+}
+
+// Each state maps the agreed keys to the agreed intents (Space = jump in 1/2 but cast in 3/4, etc.).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRDPlayerStatesKeyMapsTest, "Rediscovery.PlayerStates.KeyMaps",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRDPlayerStatesKeyMapsTest::RunTest(const FString& Parameters)
+{
+	URDPlayerStateComponent* Component = NewObject<URDPlayerStateComponent>();
+	Component->CreateDefinitions();
+	URDPlayerIntents* Intents = URDPlayerIntents::Create(GetTransientPackage());
+
+	auto Maps = [&](const FGameplayTag& State, const FKey& Key, const UInputAction* Action) -> bool
+	{
+		URDPlayerStateDefinition* Def = const_cast<URDPlayerStateDefinition*>(Component->FindDefinition(State));
+		const UInputMappingContext* Context = Def ? Def->GetInputContext(*Intents) : nullptr;
+		if (!Context)
+		{
+			return false;
+		}
+		for (const FEnhancedActionKeyMapping& Mapping : Context->GetMappings())
+		{
+			if (Mapping.Key == Key && Mapping.Action == Action)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+	auto Check = [&](const FGameplayTag& State, const FKey& Key, const UInputAction* Action, bool bExpected)
+	{
+		TestEqual(FString::Printf(TEXT("%s: %s -> %s"), *State.ToString(), *Key.ToString(), *GetNameSafe(Action)), Maps(State, Key, Action), bExpected);
+	};
+
+	for (const FGameplayTag& S : TArray<FGameplayTag>{ RDPlayerStateTags::FirstPerson, RDPlayerStateTags::ThirdPerson })
+	{
+		Check(S, EKeys::W, Intents->Move, true);
+		Check(S, EKeys::SpaceBar, Intents->Jump, true);
+		Check(S, EKeys::LeftShift, Intents->Sprint, true);
+		Check(S, EKeys::LeftMouseButton, Intents->Cast, true);
+	}
+	Check(RDPlayerStateTags::ThirdPerson, EKeys::RightMouseButton, Intents->Aim, true);
+
+	for (const FGameplayTag& S : TArray<FGameplayTag>{ RDPlayerStateTags::TopDown, RDPlayerStateTags::FreeRoam })
+	{
+		Check(S, EKeys::SpaceBar, Intents->Cast, true);
+		Check(S, EKeys::SpaceBar, Intents->Jump, false);
+		Check(S, EKeys::LeftMouseButton, Intents->Point, true);
+		Check(S, EKeys::RightMouseButton, Intents->CameraDrag, true);
+		Check(S, EKeys::LeftShift, Intents->Sprint, false);
+	}
+	Check(RDPlayerStateTags::TopDown, EKeys::W, Intents->Move, false);  // body never walks by WASD in Top Down
+	Check(RDPlayerStateTags::FreeRoam, EKeys::W, Intents->Move, true);  // WASD flies the camera
+	Check(RDPlayerStateTags::FreeRoam, EKeys::E, Intents->Vertical, true);
+	Check(RDPlayerStateTags::FreeRoam, EKeys::Q, Intents->Vertical, true);
 	return true;
 }
 

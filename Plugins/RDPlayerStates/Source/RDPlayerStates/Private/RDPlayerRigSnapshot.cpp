@@ -27,6 +27,7 @@ FRDPlayerRigSnapshot FRDPlayerRigSnapshot::Capture(const IRDPlayerStateHost& Hos
 		S.CameraLocation = Camera->GetRelativeLocation();
 		S.CameraRotation = Camera->GetRelativeRotation();
 		S.bCameraUsesControlRotation = Camera->bUsePawnControlRotation;
+		S.FieldOfView = Camera->FieldOfView;
 	}
 	if (const APawn* Pawn = Host.GetStatePawn())
 	{
@@ -73,6 +74,7 @@ void FRDPlayerRigSnapshot::Restore(IRDPlayerStateHost& Host) const
 		}
 		Camera->SetRelativeLocationAndRotation(CameraLocation, CameraRotation);
 		Camera->bUsePawnControlRotation = bCameraUsesControlRotation;
+		Camera->SetFieldOfView(FieldOfView);
 	}
 	if (APawn* Pawn = Host.GetStatePawn())
 	{

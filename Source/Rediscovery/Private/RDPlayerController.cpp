@@ -1,86 +1,45 @@
 #include "RDPlayerController.h"
+#include "RDPlayerIntents.h"
 #include "RDPlayerStateComponent.h"
 #include "RDPlayerStateDefinition.h"
+#include "RDCasterComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "InputAction.h"
 #include "InputMappingContext.h"
-#include "InputModifiers.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/Pawn.h"
 
-namespace
-{
-	UInputAction* MakeAction(UObject* Outer, const TCHAR* Name, EInputActionValueType Type)
-	{
-		UInputAction* Action = NewObject<UInputAction>(Outer, Name);
-		Action->ValueType = Type;
-		return Action;
-	}
-
-	// Map a key and optionally swap X/Y (so a key can drive the "forward" axis) and/or flip its sign.
-	void MapKey(UInputMappingContext* Context, UInputAction* Action, const FKey& Key, bool bSwizzleYX = false, bool bNegate = false)
-	{
-		FEnhancedActionKeyMapping& Mapping = Context->MapKey(Action, Key);
-		if (bSwizzleYX)
-		{
-			Mapping.Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(Context)); // default order YXZ
-		}
-		if (bNegate)
-		{
-			Mapping.Modifiers.Add(NewObject<UInputModifierNegate>(Context));
-		}
-	}
-}
-
-void ARDPlayerController::CreateInputAssets()
-{
-	if (BaseContext)
-	{
-		return;
-	}
-	MoveAction = MakeAction(this, TEXT("IA_Move"), EInputActionValueType::Axis2D);
-	LookAction = MakeAction(this, TEXT("IA_Look"), EInputActionValueType::Axis2D);
-	JumpAction = MakeAction(this, TEXT("IA_Jump"), EInputActionValueType::Boolean);
-	VerticalAction = MakeAction(this, TEXT("IA_Vertical"), EInputActionValueType::Axis1D);
-	PointerAction = MakeAction(this, TEXT("IA_Pointer"), EInputActionValueType::Boolean);
-	StateNextAction = MakeAction(this, TEXT("IA_StateNext"), EInputActionValueType::Boolean);
-	StatePrevAction = MakeAction(this, TEXT("IA_StatePrev"), EInputActionValueType::Boolean);
-
-	BaseContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Base"));
-	// Move: X = right/left, Y = forward/back.
-	MapKey(BaseContext, MoveAction, EKeys::D);
-	MapKey(BaseContext, MoveAction, EKeys::A, false, true);
-	MapKey(BaseContext, MoveAction, EKeys::W, true);
-	MapKey(BaseContext, MoveAction, EKeys::S, true, true);
-	MapKey(BaseContext, LookAction, EKeys::Mouse2D);
-	MapKey(BaseContext, JumpAction, EKeys::SpaceBar);
-	// Vertical: only Free Roam uses it (fly up/down). Space also jumps; each state picks what it listens to.
-	MapKey(BaseContext, VerticalAction, EKeys::E);
-	MapKey(BaseContext, VerticalAction, EKeys::SpaceBar);
-	MapKey(BaseContext, VerticalAction, EKeys::Q, false, true);
-	MapKey(BaseContext, VerticalAction, EKeys::LeftControl, false, true);
-	MapKey(BaseContext, PointerAction, EKeys::LeftMouseButton);
-	MapKey(BaseContext, StateNextAction, EKeys::Up);
-	MapKey(BaseContext, StatePrevAction, EKeys::Down);
-}
-
 void ARDPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	CreateInputAssets();
+	if (!Intents)
+	{
+		Intents = URDPlayerIntents::Create(this);
+		// Keys that mean the same thing in every state.
+		BaseContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Base"));
+		URDPlayerIntents::MapKey(BaseContext, Intents->Look, EKeys::Mouse2D);
+		URDPlayerIntents::MapKey(BaseContext, Intents->StateNext, EKeys::Up);
+		URDPlayerIntents::MapKey(BaseContext, Intents->StatePrev, EKeys::Down);
+	}
 
 	if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ARDPlayerController::OnMove);
-		Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &ARDPlayerController::OnLook);
-		Input->BindAction(JumpAction, ETriggerEvent::Started, this, &ARDPlayerController::OnJumpPressed);
-		Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &ARDPlayerController::OnJumpReleased);
-		Input->BindAction(VerticalAction, ETriggerEvent::Triggered, this, &ARDPlayerController::OnVertical);
-		Input->BindAction(PointerAction, ETriggerEvent::Triggered, this, &ARDPlayerController::OnPointer);
-		Input->BindAction(StateNextAction, ETriggerEvent::Started, this, &ARDPlayerController::OnStateNext);
-		Input->BindAction(StatePrevAction, ETriggerEvent::Started, this, &ARDPlayerController::OnStatePrev);
+		Input->BindAction(Intents->Move, ETriggerEvent::Triggered, this, &ARDPlayerController::OnMove);
+		Input->BindAction(Intents->Look, ETriggerEvent::Triggered, this, &ARDPlayerController::OnLook);
+		Input->BindAction(Intents->Jump, ETriggerEvent::Started, this, &ARDPlayerController::OnJumpPressed);
+		Input->BindAction(Intents->Jump, ETriggerEvent::Completed, this, &ARDPlayerController::OnJumpReleased);
+		Input->BindAction(Intents->Sprint, ETriggerEvent::Started, this, &ARDPlayerController::OnSprintPressed);
+		Input->BindAction(Intents->Sprint, ETriggerEvent::Completed, this, &ARDPlayerController::OnSprintReleased);
+		Input->BindAction(Intents->Aim, ETriggerEvent::Started, this, &ARDPlayerController::OnAimPressed);
+		Input->BindAction(Intents->Aim, ETriggerEvent::Completed, this, &ARDPlayerController::OnAimReleased);
+		Input->BindAction(Intents->CameraDrag, ETriggerEvent::Started, this, &ARDPlayerController::OnCameraDragPressed);
+		Input->BindAction(Intents->CameraDrag, ETriggerEvent::Completed, this, &ARDPlayerController::OnCameraDragReleased);
+		Input->BindAction(Intents->Vertical, ETriggerEvent::Triggered, this, &ARDPlayerController::OnVertical);
+		Input->BindAction(Intents->Point, ETriggerEvent::Triggered, this, &ARDPlayerController::OnPoint);
+		Input->BindAction(Intents->Cast, ETriggerEvent::Started, this, &ARDPlayerController::OnCast);
+		Input->BindAction(Intents->StateNext, ETriggerEvent::Started, this, &ARDPlayerController::OnStateNext);
+		Input->BindAction(Intents->StatePrev, ETriggerEvent::Started, this, &ARDPlayerController::OnStatePrev);
 	}
 
 	if (ULocalPlayer* LP = GetLocalPlayer())
@@ -95,7 +54,7 @@ void ARDPlayerController::SetupInputComponent()
 void ARDPlayerController::AcknowledgePossession(APawn* P)
 {
 	Super::AcknowledgePossession(P);
-	// Runs on the machine of the player who now controls P: listen for state changes to show feedback.
+	// Runs on the machine of the player who now controls P: follow its state changes.
 	if (URDPlayerStateComponent* States = GetStateComponent())
 	{
 		States->OnStateChanged.AddUniqueDynamic(this, &ARDPlayerController::HandleStateChanged);
@@ -109,7 +68,13 @@ URDPlayerStateComponent* ARDPlayerController::GetStateComponent() const
 	return MyPawn ? MyPawn->FindComponentByClass<URDPlayerStateComponent>() : nullptr;
 }
 
-// ---------- Device -> intent ----------
+URDCasterComponent* ARDPlayerController::GetCasterComponent() const
+{
+	const APawn* MyPawn = GetPawn();
+	return MyPawn ? MyPawn->FindComponentByClass<URDCasterComponent>() : nullptr;
+}
+
+// ---------- Intents -> systems ----------
 
 void ARDPlayerController::OnMove(const FInputActionValue& Value)
 {
@@ -131,18 +96,60 @@ void ARDPlayerController::OnJumpReleased()
 	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleJump(false); }
 }
 
+void ARDPlayerController::OnSprintPressed()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleSprint(true); }
+}
+
+void ARDPlayerController::OnSprintReleased()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleSprint(false); }
+}
+
+void ARDPlayerController::OnAimPressed()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleAim(true); }
+}
+
+void ARDPlayerController::OnAimReleased()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleAim(false); }
+}
+
+void ARDPlayerController::OnCameraDragPressed()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleCameraDrag(true); }
+}
+
+void ARDPlayerController::OnCameraDragReleased()
+{
+	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleCameraDrag(false); }
+}
+
 void ARDPlayerController::OnVertical(const FInputActionValue& Value)
 {
 	if (URDPlayerStateComponent* States = GetStateComponent()) { States->HandleVertical(Value.Get<float>()); }
 }
 
-void ARDPlayerController::OnPointer()
+void ARDPlayerController::OnPoint()
 {
 	URDPlayerStateComponent* States = GetStateComponent();
 	FHitResult Hit;
-	if (States && bShowMouseCursor && GetHitResultUnderCursor(ECC_Visibility, false, Hit))
+	if (States && GetHitResultUnderCursor(ECC_Visibility, false, Hit))
 	{
 		States->HandlePointer(Hit.ImpactPoint);
+	}
+}
+
+void ARDPlayerController::OnCast()
+{
+	// The active state decides where we aim (centre dot or mouse cursor); casting decides what happens.
+	URDPlayerStateComponent* States = GetStateComponent();
+	URDCasterComponent* Caster = GetCasterComponent();
+	FVector AimTarget;
+	if (States && Caster && States->ComputeAimTarget(AimTarget))
+	{
+		Caster->RequestCast(AimTarget);
 	}
 }
 
@@ -156,28 +163,34 @@ void ARDPlayerController::OnStatePrev()
 	if (URDPlayerStateComponent* States = GetStateComponent()) { States->RequestPreviousState(); }
 }
 
-// ---------- Feedback ----------
+// ---------- State changes ----------
 
 void ARDPlayerController::HandleStateChanged(FGameplayTag OldState, FGameplayTag NewState)
 {
 	URDPlayerStateComponent* States = GetStateComponent();
-	if (!States)
+	if (!States || !Intents)
 	{
 		return;
 	}
-	// Swap the state's own extra input context (none of the current states has one yet).
+	URDPlayerStateDefinition* NewDef = const_cast<URDPlayerStateDefinition*>(States->FindDefinition(NewState));
+
+	// Swap the keys: remove the previous state's mapping, add the new one's.
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = GetLocalPlayer() ? GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr)
 	{
-		const URDPlayerStateDefinition* OldDef = States->FindDefinition(OldState);
-		const URDPlayerStateDefinition* NewDef = States->FindDefinition(NewState);
-		if (OldDef && OldDef->GetInputContext()) { Subsystem->RemoveMappingContext(OldDef->GetInputContext()); }
-		if (NewDef && NewDef->GetInputContext()) { Subsystem->AddMappingContext(NewDef->GetInputContext(), 1); }
+		if (ActiveStateContext)
+		{
+			Subsystem->RemoveMappingContext(ActiveStateContext);
+		}
+		ActiveStateContext = NewDef ? NewDef->GetInputContext(*Intents) : nullptr;
+		if (ActiveStateContext)
+		{
+			Subsystem->AddMappingContext(ActiveStateContext, 1);
+		}
 	}
 
-	const URDPlayerStateDefinition* Def = States->FindDefinition(NewState);
-	if (GEngine && Def)
+	if (GEngine && NewDef)
 	{
-		const FString Text = FString::Printf(TEXT("State: %s   (Up/Down to switch)"), *Def->DisplayName.ToString());
+		const FString Text = FString::Printf(TEXT("State: %s   (Up/Down to switch)"), *NewDef->DisplayName.ToString());
 		GEngine->AddOnScreenDebugMessage(/*Key*/ 4401, 3.f, FColor::Cyan, Text, true, FVector2D(1.6f, 1.6f));
 	}
 }

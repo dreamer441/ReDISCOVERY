@@ -1,8 +1,8 @@
 #include "States/RDState_TopDown.h"
 #include "IRDPlayerStateHost.h"
+#include "RDPlayerIntents.h"
 #include "RDPlayerStateTags.h"
 #include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -12,81 +12,70 @@ URDState_TopDown::URDState_TopDown()
 	DisplayName = NSLOCTEXT("RDPlayerStates", "TopDown", "3 - Top Down");
 }
 
+void URDState_TopDown::MapKeys(UInputMappingContext& Context, const URDPlayerIntents& Intents) const
+{
+	URDPlayerIntents::MapKey(&Context, Intents.Point, EKeys::LeftMouseButton);
+	URDPlayerIntents::MapKey(&Context, Intents.CameraDrag, EKeys::RightMouseButton);
+	URDPlayerIntents::MapKey(&Context, Intents.Cast, EKeys::SpaceBar);
+}
+
 void URDState_TopDown::OnEnter(IRDPlayerStateHost& Host)
 {
-	bHasDestination = false;
+	Walk.Stop();
+	bDraggingCamera = false;
+	OrbitPitch = StartPitch;
+	// Start the orbit behind the body, looking the way it faces.
+	const APawn* Pawn = Host.GetStatePawn();
+	OrbitYaw = Pawn ? Pawn->GetActorRotation().Yaw : 0.f;
+
 	if (USpringArmComponent* Boom = Host.GetCameraBoom())
 	{
 		Boom->TargetArmLength = ArmLength;
 		Boom->SocketOffset = FVector::ZeroVector;
 		Boom->bUsePawnControlRotation = false;
-		// Ignore the body's rotation so the camera stays fixed in the world while the body turns.
+		// Ignore the body's rotation: the orbit angle alone decides where the camera is.
 		Boom->bInheritPitch = false;
 		Boom->bInheritYaw = false;
 		Boom->bInheritRoll = false;
-		Boom->SetRelativeRotation(FRotator(CameraPitch, 0.f, 0.f));
 		Boom->bDoCollisionTest = false;
 	}
-	if (APawn* Pawn = Host.GetStatePawn())
+	ApplyOrbit(Host);
+
+	if (APawn* MutablePawn = Host.GetStatePawn())
 	{
-		Pawn->bUseControllerRotationYaw = false;
+		MutablePawn->bUseControllerRotationYaw = false;
 	}
 	if (UCharacterMovementComponent* Move = Host.GetMovement())
 	{
-		Move->bOrientRotationToMovement = true;
+		Move->bOrientRotationToMovement = true; // body faces where it walks
 	}
-	// Cursor is a local-only concern: only the controlling player's machine shows it.
-	if (APlayerController* PC = GetLocalPlayerController(Host))
-	{
-		PC->bShowMouseCursor = true;
-		FInputModeGameAndUI Mode;
-		Mode.SetHideCursorDuringCapture(false);
-		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		PC->SetInputMode(Mode);
-	}
+	SetCursorMode(Host, true);
 }
 
 void URDState_TopDown::OnExit(IRDPlayerStateHost& Host)
 {
-	bHasDestination = false;
-	if (APlayerController* PC = GetLocalPlayerController(Host))
-	{
-		PC->bShowMouseCursor = false;
-		PC->SetInputMode(FInputModeGameOnly());
-	}
+	Walk.Stop();
+	bDraggingCamera = false;
+	SetCursorMode(Host, false);
 }
 
-float URDState_TopDown::GetCameraYaw(const IRDPlayerStateHost& Host) const
+void URDState_TopDown::HandleLook(IRDPlayerStateHost& Host, const FVector2D& Input)
 {
-	const USpringArmComponent* Boom = Host.GetCameraBoom();
-	return Boom ? Boom->GetComponentRotation().Yaw : 0.f;
-}
-
-void URDState_TopDown::HandleMove(IRDPlayerStateHost& Host, const FVector2D& Input)
-{
-	bHasDestination = false; // keyboard takes over from a clicked destination
-	MoveRelativeToYaw(Host, GetCameraYaw(Host), Input);
-}
-
-void URDState_TopDown::HandlePointer(IRDPlayerStateHost& Host, const FVector& WorldTarget)
-{
-	Destination = WorldTarget;
-	bHasDestination = true;
-}
-
-void URDState_TopDown::TickState(IRDPlayerStateHost& Host, float DeltaSeconds)
-{
-	APawn* Pawn = Host.GetStatePawn();
-	if (!Pawn || !bHasDestination)
+	// The mouse only moves the camera while right mouse is held.
+	if (!bDraggingCamera)
 	{
 		return;
 	}
-	FVector ToTarget = Destination - Pawn->GetActorLocation();
-	ToTarget.Z = 0.f;
-	if (ToTarget.Size() <= ArriveDistance)
+	OrbitYaw += Input.X * DragSensitivity;
+	OrbitPitch = FMath::Clamp(OrbitPitch + Input.Y * DragSensitivity, MinPitch, MaxPitch);
+	ApplyOrbit(Host);
+}
+
+void URDState_TopDown::ApplyOrbit(IRDPlayerStateHost& Host) const
+{
+	if (USpringArmComponent* Boom = Host.GetCameraBoom())
 	{
-		bHasDestination = false; // arrived; the component will switch its tick off
-		return;
+		// Inherit flags are off, so this relative rotation is the orbit's world rotation.
+		Boom->SetRelativeRotation(FRotator(OrbitPitch, OrbitYaw, 0.f));
 	}
-	Pawn->AddMovementInput(ToTarget.GetSafeNormal(), 1.f);
 }

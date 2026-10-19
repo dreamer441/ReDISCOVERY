@@ -10,7 +10,7 @@ public class Rediscovery : ModuleRules
 	
 		// The game module only assembles: pawn, controller and game mode built from the Node Box plugins.
 		// Nothing may depend on this module.
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "RDCore", "RDPlayerStates" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "RDCore", "RDPlayerStates", "RDCasting" });
 
 		// Editor-only: the Play-In-Editor automation test needs editor helpers.
 		if (Target.bBuildEditor)

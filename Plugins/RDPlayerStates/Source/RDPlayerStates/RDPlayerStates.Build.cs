@@ -7,6 +7,6 @@ public class RDPlayerStates : ModuleRules
 	public RDPlayerStates(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "GameplayTags", "EnhancedInput", "RDCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "GameplayTags", "InputCore", "EnhancedInput", "RDCore" });
 	}
 }

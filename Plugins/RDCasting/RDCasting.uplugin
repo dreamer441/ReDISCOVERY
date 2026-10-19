@@ -1,0 +1,19 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "RD Casting",
+	"Description": "Cast requests (validated on the server) and, for now, one placeholder Function: a basic projectile.",
+	"Category": "Rediscovery",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "RDCasting",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{ "Name": "RDCore", "Enabled": true }
+	]
+}

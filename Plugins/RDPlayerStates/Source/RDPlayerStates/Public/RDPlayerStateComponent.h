@@ -51,6 +51,18 @@ public:
 	void HandleJump(bool bPressed);
 	void HandleVertical(float Input);
 	void HandlePointer(const FVector& WorldTarget);
+	void HandleAim(bool bPressed);
+	void HandleCameraDrag(bool bPressed);
+	void HandleSprint(bool bPressed); // only works if the active state allows it; the server applies it too
+
+	// Where a cast would go right now, as decided by the active state. False if the state cannot aim.
+	bool ComputeAimTarget(FVector& OutTarget) const;
+
+	// Sprint speed = normal walk speed x this.
+	UPROPERTY(EditDefaultsOnly, Category = "Player States")
+	float SprintSpeedMultiplier = 1.8f;
+
+	bool IsSprinting() const { return bSprinting; }
 
 	// Run Exit+Enter again for the current state (e.g. after the pawn gets a controller, so local-only
 	// settings such as the mouse cursor are applied on the right machine).
@@ -94,8 +106,17 @@ private:
 	// Runs on every machine when the tag changes: Exit old definition, Enter new one, notify listeners.
 	void ApplyState(const FGameplayTag& OldState, const FGameplayTag& NewState);
 
+	UFUNCTION(Server, Reliable)
+	void ServerSetSprinting(bool bWantsSprint);
+
+	// Changes walk speed on this machine. Called locally (instant feel) and on the server (authoritative).
+	void ApplySprint(bool bWantsSprint);
+
 	IRDPlayerStateHost* GetHost() const;
 	void UpdateTickNeed();
+
+	bool bSprinting = false;
+	float WalkSpeedBeforeSprint = 0.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentStateTag)
 	FGameplayTag CurrentStateTag;

@@ -11,6 +11,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class URDPlayerStateComponent;
+class URDCasterComponent;
 
 UCLASS()
 class REDISCOVERY_API ARDCharacter : public ACharacter, public IRDPlayerStateHost
@@ -21,6 +22,7 @@ public:
 	ARDCharacter();
 
 	URDPlayerStateComponent* GetPlayerStateComponent() const { return PlayerStates; }
+	URDCasterComponent* GetCasterComponent() const { return Caster; }
 
 	// IRDPlayerStateHost
 	virtual APawn* GetStatePawn() const override { return const_cast<ARDCharacter*>(this); }
@@ -42,4 +44,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player States")
 	TObjectPtr<URDPlayerStateComponent> PlayerStates;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Casting")
+	TObjectPtr<URDCasterComponent> Caster;
 };

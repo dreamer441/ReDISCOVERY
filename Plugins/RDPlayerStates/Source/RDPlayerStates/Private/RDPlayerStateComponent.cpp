@@ -10,6 +10,7 @@
 #include "States/RDState_TopDown.h"
 #include "States/RDState_FreeRoam.h"
 #include "Net/UnrealNetwork.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 URDPlayerStateComponent::URDPlayerStateComponent()
 {
@@ -149,11 +150,12 @@ void URDPlayerStateComponent::ApplyState(const FGameplayTag& OldState, const FGa
 		UE_LOG(LogRDPlayerStates, Warning, TEXT("[%s] owner does not implement IRDPlayerStateHost; state not applied"), *GetNameSafe(GetOwner()));
 		return;
 	}
+	ApplySprint(false); // a sprint never carries over into another state
 	if (ActiveDefinition)
 	{
 		ActiveDefinition->Exit(*Host);
 	}
-	ActiveDefinition = const_cast<URDPlayerStateDefinition*>(FindDefinition(NewState));
+	ActiveDefinition =const_cast<URDPlayerStateDefinition*>(FindDefinition(NewState));
 	if (ActiveDefinition)
 	{
 		ActiveDefinition->Enter(*Host);
@@ -202,6 +204,75 @@ void URDPlayerStateComponent::HandlePointer(const FVector& WorldTarget)
 		ActiveDefinition->HandlePointer(*Host, WorldTarget);
 		UpdateTickNeed(); // e.g. Top Down now has somewhere to walk to
 	}
+}
+
+void URDPlayerStateComponent::HandleAim(bool bPressed)
+{
+	if (IRDPlayerStateHost* Host = GetHost(); Host && ActiveDefinition)
+	{
+		ActiveDefinition->HandleAim(*Host, bPressed);
+		if (bPressed && !ActiveDefinition->AllowsSprint())
+		{
+			HandleSprint(false); // e.g. aiming cancels a sprint
+		}
+		UpdateTickNeed(); // camera blends into / out of aim
+	}
+}
+
+void URDPlayerStateComponent::HandleCameraDrag(bool bPressed)
+{
+	if (IRDPlayerStateHost* Host = GetHost(); Host && ActiveDefinition) { ActiveDefinition->HandleCameraDrag(*Host, bPressed); }
+}
+
+void URDPlayerStateComponent::HandleSprint(bool bPressed)
+{
+	const bool bWants = bPressed && ActiveDefinition && ActiveDefinition->AllowsSprint();
+	if (bWants == bSprinting)
+	{
+		return;
+	}
+	ApplySprint(bWants);
+	if (!RDAuthority::HasWorldAuthority(GetOwner()))
+	{
+		ServerSetSprinting(bWants);
+	}
+}
+
+void URDPlayerStateComponent::ServerSetSprinting_Implementation(bool bWantsSprint)
+{
+	// Never trust the client: the server checks its own copy of the active state.
+	const bool bAllowed = bWantsSprint && ActiveDefinition && ActiveDefinition->AllowsSprint();
+	if (bWantsSprint && !bAllowed)
+	{
+		UE_LOG(LogRDPlayerStates, Log, TEXT("[%s] sprint REFUSED in %s"), *GetNameSafe(GetOwner()), *CurrentStateTag.ToString());
+	}
+	ApplySprint(bAllowed);
+}
+
+void URDPlayerStateComponent::ApplySprint(bool bWantsSprint)
+{
+	IRDPlayerStateHost* Host = GetHost();
+	UCharacterMovementComponent* Move = Host ? Host->GetMovement() : nullptr;
+	if (!Move || bWantsSprint == bSprinting)
+	{
+		return;
+	}
+	if (bWantsSprint)
+	{
+		WalkSpeedBeforeSprint = Move->MaxWalkSpeed;
+		Move->MaxWalkSpeed = WalkSpeedBeforeSprint * SprintSpeedMultiplier;
+	}
+	else
+	{
+		Move->MaxWalkSpeed = WalkSpeedBeforeSprint;
+	}
+	bSprinting = bWantsSprint;
+}
+
+bool URDPlayerStateComponent::ComputeAimTarget(FVector& OutTarget) const
+{
+	const IRDPlayerStateHost* Host = GetHost();
+	return Host && ActiveDefinition && ActiveDefinition->ComputeAimTarget(*Host, OutTarget);
 }
 
 void URDPlayerStateComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
